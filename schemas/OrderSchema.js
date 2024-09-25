@@ -1,10 +1,10 @@
 const { Schema } = require("mongoose");
 
-const WatchListSchema = new Schema({
+const OrderSchema = new Schema({
   name: String,
   price: Number,
   percent: String,
-  isDown: Boolean,
+  mode: String,
 });
 
-module.exports = WatchListSchema;
+module.exports = { OrderSchema };
