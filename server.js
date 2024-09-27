@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 
 const { HoldingsModel } = require("./models/HoldingsModel");
 const { PositionsModel } = require("./models/PositionsModel");
+const { OrdersModel } = require("./models/OrdersModel");
 
 const app = express();
 app.use(cors());
@@ -195,6 +196,21 @@ app.get("/holdings", async (req, res) => {
 app.get("/positions", async (req, res) => {
   const positions = await PositionsModel.find();
   res.json(positions);
+});
+
+app.post("/buyStock", async (req, res) => {
+  const { name, quantity, price } = req.body;
+
+  const newStock = new OrdersModel({
+    name: name,
+    price: price,
+    qty: quantity,
+    mode: "Buy",
+  });
+
+  newStock.save();
+
+  res.send("Stock purchased!!");
 });
 
 const connectDB = async () => {
