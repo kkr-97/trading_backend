@@ -2,10 +2,17 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const { check, validationResult } = require("express-validator");
+
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 const { HoldingsModel } = require("./models/HoldingsModel");
 const { PositionsModel } = require("./models/PositionsModel");
 const { OrdersModel } = require("./models/OrdersModel");
+const { UserModel } = require("./models/UserModel");
+
+const verifyUser = require("./middleware/verifyUser");
 
 const app = express();
 app.use(cors());
@@ -15,202 +22,184 @@ require("dotenv").config();
 const port = process.env.PORT || 3002;
 const uri = process.env.MONGODB_URI;
 
-// Adding Holdings data Initially
-// app.get("/pushHoldingsData", async (req, res) => {
-//   const tempHoldings = [
-//     {
-//       name: "BHARTIARTL",
-//       qty: 2,
-//       avg: 538.05,
-//       price: 541.15,
-//       net: "+0.58%",
-//       day: "+2.99%",
-//     },
-//     {
-//       name: "HDFCBANK",
-//       qty: 2,
-//       avg: 1383.4,
-//       price: 1522.35,
-//       net: "+10.04%",
-//       day: "+0.11%",
-//     },
-//     {
-//       name: "HINDUNILVR",
-//       qty: 1,
-//       avg: 2335.85,
-//       price: 2417.4,
-//       net: "+3.49%",
-//       day: "+0.21%",
-//     },
-//     {
-//       name: "INFY",
-//       qty: 1,
-//       avg: 1350.5,
-//       price: 1555.45,
-//       net: "+15.18%",
-//       day: "-1.60%",
-//       isLoss: true,
-//     },
-//     {
-//       name: "ITC",
-//       qty: 5,
-//       avg: 202.0,
-//       price: 207.9,
-//       net: "+2.92%",
-//       day: "+0.80%",
-//     },
-//     {
-//       name: "KPITTECH",
-//       qty: 5,
-//       avg: 250.3,
-//       price: 266.45,
-//       net: "+6.45%",
-//       day: "+3.54%",
-//     },
-//     {
-//       name: "M&M",
-//       qty: 2,
-//       avg: 809.9,
-//       price: 779.8,
-//       net: "-3.72%",
-//       day: "-0.01%",
-//       isLoss: true,
-//     },
-//     {
-//       name: "RELIANCE",
-//       qty: 1,
-//       avg: 2193.7,
-//       price: 2112.4,
-//       net: "-3.71%",
-//       day: "+1.44%",
-//     },
-//     {
-//       name: "SBIN",
-//       qty: 4,
-//       avg: 324.35,
-//       price: 430.2,
-//       net: "+32.63%",
-//       day: "-0.34%",
-//       isLoss: true,
-//     },
-//     {
-//       name: "SGBMAY29",
-//       qty: 2,
-//       avg: 4727.0,
-//       price: 4719.0,
-//       net: "-0.17%",
-//       day: "+0.15%",
-//     },
-//     {
-//       name: "TATAPOWER",
-//       qty: 5,
-//       avg: 104.2,
-//       price: 124.15,
-//       net: "+19.15%",
-//       day: "-0.24%",
-//       isLoss: true,
-//     },
-//     {
-//       name: "TCS",
-//       qty: 1,
-//       avg: 3041.7,
-//       price: 3194.8,
-//       net: "+5.03%",
-//       day: "-0.25%",
-//       isLoss: true,
-//     },
-//     {
-//       name: "WIPRO",
-//       qty: 4,
-//       avg: 489.3,
-//       price: 577.75,
-//       net: "+18.08%",
-//       day: "+0.32%",
-//     },
-//   ];
+app.post(
+  "/register",
+  [
+    check("email", "Please include a valid email").isEmail(),
+    check("username", "username is required").not().isEmpty(),
+    check("password", "Password must be 6 or more characters").isLength({
+      min: 6,
+    }),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ message: errors.errors[0].msg });
+      }
+      const { username, password, email } = req.body;
 
-//   tempHoldings.forEach((item) => {
-//     const newData = new HoldingsModel({
-//       name: item.name,
-//       qty: item.qty,
-//       avg: item.avg,
-//       price: item.price,
-//       net: item.net,
-//       day: item.day,
-//       isLoss: item.isLoss,
-//     });
+      const userDate = await UserModel.findOne({ email: email });
 
-//     newData.save();
-//   });
+      if (userDate) {
+        res.status(400).json({ message: "User Already Registered" });
+        return;
+      }
 
-//   res.send("Data Added!");
-// });
+      const salt = await bcrypt.genSalt(7);
+      const hashedPassword = await bcrypt.hash(password, salt);
 
-// Adding Positions data initially
-// app.get("/addPositions", async (req, res) => {
-//   const tempPositions = [
-//     {
-//       product: "CNC",
-//       name: "EVEREADY",
-//       qty: 2,
-//       avg: 316.27,
-//       price: 312.35,
-//       net: "+0.58%",
-//       day: "-1.24%",
-//       isLoss: true,
-//     },
-//     {
-//       product: "CNC",
-//       name: "JUBLFOOD",
-//       qty: 1,
-//       avg: 3124.75,
-//       price: 3082.65,
-//       net: "+10.04%",
-//       day: "-1.35%",
-//       isLoss: true,
-//     },
-//   ];
+      const newUser = new UserModel({
+        email,
+        username,
+        password: hashedPassword,
+      });
 
-//   tempPositions.forEach((item) => {
-//     const newPosition = new PositionsModel({
-//       product: item.product,
-//       name: item.name,
-//       qty: item.qty,
-//       avg: item.avg,
-//       price: item.price,
-//       net: item.net,
-//       day: item.day,
-//       isLoss: item.isLoss,
-//     });
+      const token = jwt.sign({ username }, process.env.SECRET_TOKEN, {
+        expiresIn: "1h",
+      });
+      await newUser.save();
+      res.json({ token });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: e });
+    }
+  }
+);
 
-//     newPosition.save();
-//     res.send("Positions Added!");
-//   });
-// });
+app.post(
+  "/login",
+  [
+    check("email", "Please include a valid email").isEmail(),
+    check("password", "Password is required").exists(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: errors.errors[0].msg });
+    }
 
-app.get("/holdings", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      const user = await UserModel.findOne({ email: email });
+      if (!user) {
+        return res.status(400).json({ message: "User Not Found" });
+      }
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(400).json({ message: "Invalid Password" });
+      }
+      const token = jwt.sign(
+        { username: user.username },
+        process.env.SECRET_TOKEN,
+        {
+          expiresIn: 360000,
+        }
+      );
+      res.status(200).json({ token });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: e });
+    }
+  }
+);
+
+app.get("/protected_route", verifyUser, (req, res) => {
+  res.json({ message: "This is a protected route" });
+});
+
+app.get("/holdings", verifyUser, async (req, res) => {
   const holdings = await HoldingsModel.find();
   res.json(holdings);
 });
 
-app.get("/positions", async (req, res) => {
+app.get("/positions", verifyUser, async (req, res) => {
   const positions = await PositionsModel.find();
   res.json(positions);
 });
 
-app.post("/buyStock", async (req, res) => {
-  const { name, quantity, price } = req.body;
+app.get("/orders", verifyUser, async (req, res) => {
+  const orders = await OrdersModel.find();
+  res.json(orders);
+});
 
-  const newStock = new OrdersModel({
-    name: name,
-    price: price,
-    qty: quantity,
-    mode: "Buy",
-  });
+app.post("/buyStock", verifyUser, async (req, res) => {
+  const { name, qty, net, price } = req.body;
 
-  newStock.save();
+  try {
+    const holding = await HoldingsModel.findOne({ name });
 
-  res.send("Stock purchased!!");
+    const newStock = new OrdersModel({
+      date: new Date().toLocaleString(),
+      name: name,
+      price,
+      qty: qty,
+      net: net,
+      mode: "Buy",
+    });
+    newStock.save();
+
+    if (!holding) {
+      const newHolding = new HoldingsModel({
+        name: name,
+        qty: qty,
+        avg: price,
+        price: price,
+        net: net,
+        day: net,
+      });
+      newHolding.save();
+    } else {
+      (holding.qty = parseInt(holding.qty) + parseInt(qty)),
+        (holding.price = (
+          parseFloat(holding.price) +
+          parseFloat(price) / 2
+        ).toFixed(2));
+      holding.net = net;
+      holding.save();
+    }
+    res.status(200).json({ message: "Stock Purchased!!" });
+  } catch (e) {
+    console.error("Error: ", e);
+  }
+});
+
+app.post("/sellStock", verifyUser, async (req, res) => {
+  const { name, qty, price } = req.body;
+  const holding = await HoldingsModel.findOne({ name });
+
+  try {
+    if (!holding) {
+      res.status(400).json({ message: "Stock Doesnot exist in your holdings" });
+      return;
+    }
+
+    if (holding.qty < qty) {
+      res
+        .status(400)
+        .json({ message: `Please select Quantity less than ${holding.qty}` });
+    } else {
+      holding.qty -= qty;
+      if (holding.qty === 0) {
+        await HoldingsModel.deleteOne({ name: name });
+      } else {
+        await holding.save();
+      }
+      const newStock = new OrdersModel({
+        date: new Date().toLocaleString(),
+        name: name,
+        price: price,
+        qty: qty,
+        mode: "Sell",
+      });
+
+      await newStock.save();
+      res.status(200).json({ message: "Stock successfully sold!" });
+    }
+  } catch (e) {
+    res.status(500).json({ message: e });
+    console.error(e);
+  }
 });
 
 const connectDB = async () => {
