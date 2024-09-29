@@ -158,7 +158,9 @@ app.post("/buyStock", verifyUser, async (req, res) => {
       holding.net = net;
       holding.save();
     }
-    res.status(200).json({ message: "Stock Purchased!!" });
+    res.status(200).json({
+      message: `You successfully purchased ${qty} stocks of ${name} !!`,
+    });
   } catch (e) {
     console.error("Error: ", e);
   }
@@ -194,7 +196,9 @@ app.post("/sellStock", verifyUser, async (req, res) => {
       });
 
       await newStock.save();
-      res.status(200).json({ message: "Stock successfully sold!" });
+      res
+        .status(200)
+        .json({ message: `You successfully sold ${qty} stocks of ${name} !!` });
     }
   } catch (e) {
     res.status(500).json({ message: e });
